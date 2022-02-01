@@ -37,7 +37,7 @@ The solution proposed is to sort the records by sys_updated_on and upsert (inser
 ### Timestamp Problem
 
 To solve this problem, additionally sort by `sys_id` and query the next page as following:  
-`sys_updated_on == last_page_max(sys_updated_on) && sys_id > last_page_max(sys_id)`
+`(sys_updated_on  > last_page_max(sys_updated_on)) OR (sys_updated_on == last_page_max(sys_updated_on) && sys_id > last_page_max(sys_id))`
 
 ### Empty Page Problem
 
