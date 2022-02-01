@@ -441,5 +441,6 @@ const getThreads = (num = 1) => {
 
 module.exports = {
     increment,
-    snapshot
+    snapshot,
+    getThreads
 }
