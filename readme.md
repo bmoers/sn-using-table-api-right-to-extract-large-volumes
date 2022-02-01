@@ -2,7 +2,7 @@
 
 ## Problem description
 
-Loading data correctly from ServiceNow can be challenging if the records in ServiceNow do frequently change, ACLS apply or data is deleted.  
+Loading data correctly from ServiceNow can be challenging if the records in ServiceNow do frequently change, ACL's apply or data is deleted.  
 
 Daniel Draes wrote a [ServiceNow Community article](https://community.servicenow.com/community?id=community_article&sys_id=80ec3bb7db13c890414eeeb5ca961929) about this topic.  
 However the solution he proposed has some drawbacks.  
@@ -13,7 +13,7 @@ The solution proposed is to sort the records by sys_updated_on and upsert (inser
 
 **multi threading** - multi threading on timestamp requires to have good knowledge of the data and how its spread over the day  
 **empty page** - an empty page is **not** an indicator that there is no more data - there is a good chance that there is just an ACL causing an empty page  
-**identical timestamp** - there is a risk that all records in a page do have the same timestamp value, in that case the query to the nex page (timestamp > lastrow(timestamp)) will miss some records.
+**identical timestamp** - there is a risk that all records in a page do have the same timestamp value, in that case the query to the nex page (timestamp > lastrow(timestamp)) will miss some records.  
 **rolling end** - if the records are created/updated in high frequency the number of rows exceed the window size and the job never ends
 
 ## Solution Proposed
@@ -73,3 +73,12 @@ order by
     sys_updated_on ASC, sys_id ASC
 
 limit 2000
+```
+
+## Reference Implementation
+
+### Thread and jobs sequence
+
+- [sample-snapshot-2-tread-with-acl.json](./sample/sample-snapshot-2-tread-with-acl.json)
+- [sample-increment-2-tread-with-acl.json.jsonn](./sample/sample-increment-2-tread-with-acl.json.json)
+
