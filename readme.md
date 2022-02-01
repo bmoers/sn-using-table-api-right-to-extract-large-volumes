@@ -83,7 +83,11 @@ where
     case when (there are NO rows on the page) then 
         use the next link from the header
     else
-        (sys_updated_on == last_page_max(sys_updated_on) && sys_id > last_page_max(sys_id) )
+        (
+            sys_updated_on  > last_page_max(sys_updated_on) 
+        ) OR (
+            sys_updated_on == last_page_max(sys_updated_on) && sys_id > last_page_max(sys_id) 
+        )
     end
 order by
     sys_updated_on ASC, sys_id ASC
