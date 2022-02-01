@@ -1,0 +1,68 @@
+{
+    "totalRows": 0,
+    "totalPages": 2,
+    "jobs": [
+        {
+            "thread": {
+                "max": "80",
+                "query": "sys_id<80"
+            },
+            "index": 0,
+            "pages": 1,
+            "query": "sys_id<80^sys_updated_on>2022-01-26 20:53:18^sys_id=129219e12f914510d8455aab2799b6c3",
+            "totalRowCount": 0,
+            "config": [
+                {
+                    "uri": "https://dev65672.service-now.com",
+                    "table": "u_rest_api_acl_test",
+                    "fields": [
+                        "sys_id",
+                        "sys_updated_on"
+                    ],
+                    "query": "sys_id<80^sys_updated_on>2022-01-26 20:53:18^sys_id=129219e12f914510d8455aab2799b6c3",
+                    "dateField": "sys_updated_on",
+                    "sysIdField": "sys_id",
+                    "limit": 25,
+                    "continue": true,
+                    "pageThreshold": 1.5,
+                    "pageRowCount": 0,
+                    "requestURL": "https://dev65672.service-now.com/api/now/table/u_rest_api_acl_test?sysparm_fields=sys_id,sys_updated_on&sysparm_query=sys_id<80^sys_updated_on>2022-01-26 20:53:18^sys_id=129219e12f914510d8455aab2799b6c3^ORDERBYsys_updated_on^ORDERBYsys_id&sysparm_limit=25",
+                    "message": "pageRowCount is 0\nthere is no next link. this is the end of the query"
+                }
+            ],
+            "expectedRowCount": 1,
+            "expectedPageCount": 1
+        },
+        {
+            "thread": {
+                "min": "80",
+                "query": "sys_id>=80"
+            },
+            "index": 1,
+            "pages": 1,
+            "query": "sys_id>=80^sys_updated_on>2022-01-26 20:53:18^sys_id=129219e12f914510d8455aab2799b6c3",
+            "totalRowCount": 0,
+            "config": [
+                {
+                    "uri": "https://dev65672.service-now.com",
+                    "table": "u_rest_api_acl_test",
+                    "fields": [
+                        "sys_id",
+                        "sys_updated_on"
+                    ],
+                    "query": "sys_id>=80^sys_updated_on>2022-01-26 20:53:18^sys_id=129219e12f914510d8455aab2799b6c3",
+                    "dateField": "sys_updated_on",
+                    "sysIdField": "sys_id",
+                    "limit": 25,
+                    "continue": true,
+                    "pageThreshold": 1.5,
+                    "pageRowCount": 0,
+                    "requestURL": "https://dev65672.service-now.com/api/now/table/u_rest_api_acl_test?sysparm_fields=sys_id,sys_updated_on&sysparm_query=sys_id>=80^sys_updated_on>2022-01-26 20:53:18^sys_id=129219e12f914510d8455aab2799b6c3^ORDERBYsys_updated_on^ORDERBYsys_id&sysparm_limit=25",
+                    "message": "no records found with this query"
+                }
+            ],
+            "expectedRowCount": 0,
+            "expectedPageCount": 0
+        }
+    ]
+}
