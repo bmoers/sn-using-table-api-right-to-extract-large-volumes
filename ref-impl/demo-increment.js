@@ -8,7 +8,7 @@ const testIncrement = async () => {
         uri: process.env.HOST_NAME,
         table: process.env.TABLE_NAME,
         threads: 2,
-        query: "sys_id=129219e12f914510d8455aab2799b6c3",
+        //query: "sys_id=129219e12f914510d8455aab2799b6c3",
         maxDateValue
     }, async (results) => {
         //console.log(`Simulate Persist for Page Rows: ${results.length}`);
