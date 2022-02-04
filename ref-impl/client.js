@@ -2,6 +2,7 @@ require('dotenv').config()
 
 const axios = require('axios');
 const parse = require('parse-link-header');
+const get = require('./get');
 
 const baseRequestConfiguration = {
     uri: undefined,
@@ -12,6 +13,7 @@ const baseRequestConfiguration = {
     lastPageMaxSysId: undefined,
     dateField: 'sys_updated_on',
     sysIdField: 'sys_id',
+    sysparm: undefined,
     url: undefined,
     limit: 25,
     continue: true,
@@ -44,11 +46,13 @@ const loadData = async (url) => {
  * @param {String} config.query - Query condition
  * @param {Number} config.limit - Number of rows per page
  * @param {String} config.dateField - sys_updated_on or sys_created_on
+ * @param {String} config.sysIdField - field holding the sys_id (default sys_id) 
+ * @param {String} config.sysparm - additional sysparm_ arguments like sysparm_display_value 
  * @param {Number} config.pageThreshold - Stop loading additional data if number of loaded pages exceeds this factor (handy if table changes quickly while loading data)
  * 
  * @returns {Object} configuration object
  */
-const getBaseConfiguration = ({ uri, table, fields, query, limit, dateField, pageThreshold }) => {
+const getBaseConfiguration = ({ uri, table, fields, query, limit, dateField, sysIdField, sysparm, pageThreshold }) => {
 
     if (!uri) {
         throw Error('URI of ServiceNow Instance not defined');
@@ -70,9 +74,15 @@ const getBaseConfiguration = ({ uri, table, fields, query, limit, dateField, pag
             config.fields = fields.split(',').map((f) => f.trim());
         }
     }
-
+    if (sysIdField) {
+        config.sysIdField = sysIdField;
+    }
     if (!config.fields.includes(config.sysIdField)) {
         config.fields.push(config.sysIdField);
+    }
+
+    if (dateField) {
+        config.dateField = dateField;
     }
     if (!config.fields.includes(config.dateField)) {
         config.fields.push(config.dateField);
@@ -82,13 +92,23 @@ const getBaseConfiguration = ({ uri, table, fields, query, limit, dateField, pag
     if (limit != undefined) {
         config.limit = limit;
     }
-    if (dateField) {
-        config.dateField = dateField;
-    }
+
     if (pageThreshold && typeof pageThreshold == 'number') {
         // threshold can not be less than 1
         config.pageThreshold = Math.max(1, Math.abs(pageThreshold));
     }
+
+    if (sysparm) {
+        // ensure the extra sysparm does not overwrite the reserved ones
+        const parmArr = sysparm.split('&');
+        const reservedNames = ['sysparm_fields', 'sysparm_query', 'sysparm_limit'];
+        const addParm = parmArr.filter((parm) => {
+            const name = parm.split('=')[0];
+            return !reservedNames.includes(name)
+        })
+        config.sysparm = addParm.join('&');
+    }
+
     return config;
 }
 
@@ -102,6 +122,8 @@ const getBaseConfiguration = ({ uri, table, fields, query, limit, dateField, pag
  * @param {String} config.query - Query condition
  * @param {Number} config.limit - Number of rows per page
  * @param {String} config.dateField - sys_updated_on or sys_created_on
+ * @param {String} config.sysIdField - field holding the sys_id (default sys_id) 
+ * @param {String} config.sysparm - additional sysparm_ arguments like sysparm_display_value 
  * @param {Number} config.pageThreshold - Stop loading additional data if number of loaded pages exceeds this factor (handy if table changes quickly while loading data)
  * 
  * @param {Object} response - the Axios response from the previous call
@@ -110,9 +132,9 @@ const getBaseConfiguration = ({ uri, table, fields, query, limit, dateField, pag
  * 
  * @returns {Object} request configuration object
  */
-const getRequestConfiguration = ({ uri, table, fields, query, limit, dateField, pageThreshold }, response, pageNum, expectedPageCount) => {
+const getRequestConfiguration = ({ uri, table, fields, query, limit, dateField, sysIdField, sysparm, pageThreshold }, response, pageNum, expectedPageCount) => {
 
-    const config = getBaseConfiguration({ uri, table, fields, query, limit, dateField, pageThreshold })
+    const config = getBaseConfiguration({ uri, table, fields, query, limit, dateField, sysIdField, sysparm, pageThreshold })
 
     // the count information is based on raw SQL query ant not following any ACL
     let queryTotalRowCount = parseInt((response.headers['x-total-count'] || 0), 10);
@@ -160,8 +182,40 @@ const getRequestConfiguration = ({ uri, table, fields, query, limit, dateField, 
 
     // get the timestamp & sysId information from the last record in the response
     const lastRow = result[pageRowCount - 1];
-    config.lastPageMaxDate = lastRow[config.dateField];
-    config.lastPageMaxSysId = lastRow[config.sysIdField];
+    let lastPageMaxDate = lastRow[config.dateField];
+
+    if (lastPageMaxDate == undefined) {
+        // if there is no field with the given name, try to dotwalk to it
+        lastPageMaxDate = get(config.dateField.split('.'), lastRow)
+    }
+    if(lastPageMaxDate == null){
+        console.error(`No value found in response for field ${config.dateField}`)
+    }
+
+    if (lastPageMaxDate != null && typeof lastPageMaxDate == 'object') {
+        // in case its an object with a value param
+        config.lastPageMaxDate = lastPageMaxDate.value;
+    } else {
+        config.lastPageMaxDate = lastPageMaxDate;
+    }
+
+    let lastPageMaxSysId = lastRow[config.sysIdField];
+    if (lastPageMaxSysId == undefined) {
+        // if there is no field with the given name, try to dotwalk to it
+        lastPageMaxSysId = get(config.sysIdField.split('.'), lastRow)
+    }
+
+    if(lastPageMaxSysId == null){
+        console.error(`No value found in response for field ${config.sysIdField}`)
+    }
+
+    if (lastPageMaxSysId != null && typeof lastPageMaxSysId == 'object') {
+        // in case its an object with a value param
+        config.lastPageMaxSysId = lastPageMaxSysId.value;
+    } else {
+        config.lastPageMaxSysId = lastPageMaxSysId;
+    }
+
     config.continue = true;
 
     return config;
@@ -176,15 +230,17 @@ const getRequestConfiguration = ({ uri, table, fields, query, limit, dateField, 
  * @param {String} config.query - Query condition
  * @param {Number} config.limit - Number of rows per page
  * @param {String} config.dateField - sys_updated_on or sys_created_on
+ * @param {String} config.sysIdField - field holding the sys_id (default sys_id) 
+ * @param {String} config.sysparm - additional sysparm_ arguments like sysparm_display_value 
  * @param {Number} config.threads - Number of parallel threads to load data
  * @param {Number} config.pageThreshold - Stop loading additional data if number of loaded pages exceeds this factor (handy if table changes quickly while loading data)
  * @param {Promise<Array>} pageCallback - Results of the current page
  * @returns {Array} list of processed threads and pages
  */
-const run = async ({ uri, table, fields, query, limit, dateField, threads = 1, pageThreshold }, pageCallback = async (results) => {}) => {
+const run = async ({ uri, table, fields, query, limit, dateField, sysIdField, sysparm, threads = 1, pageThreshold }, pageCallback = async (results) => {}) => {
 
     // get the sys_id queries to split the load
-    const threadsArray = getThreads(threads);
+    const threadsArray = getThreads(threads, sysIdField);
 
     // parallel execution of all threads
     const out = threadsArray.map(async (thread, index) => {
@@ -212,7 +268,7 @@ const run = async ({ uri, table, fields, query, limit, dateField, threads = 1, p
         const logs = { thread, index, pages: undefined, query: pageQuery, totalRowCount, config: [] };
 
         // get the base properties
-        const baseProperties = getBaseConfiguration({ uri, table, fields, query: pageQuery, limit, dateField, pageThreshold });
+        const baseProperties = getBaseConfiguration({ uri, table, fields, query: pageQuery, limit, dateField, sysIdField, sysparm, pageThreshold });
         // this is also the starting point for the first request
         let config = { ...baseProperties };
 
@@ -228,7 +284,7 @@ const run = async ({ uri, table, fields, query, limit, dateField, threads = 1, p
             } else {
 
                 // order by the date and sys_id field
-                const orderBy = `ORDERBY${config.dateField}^ORDERBYsys_id`;
+                const orderBy = `ORDERBY${config.dateField}^ORDERBY${config.sysIdField}`;
 
                 // construct the url based on the query params
                 let query = orderBy;
@@ -252,7 +308,7 @@ const run = async ({ uri, table, fields, query, limit, dateField, threads = 1, p
                     query = `${config.query}^${orderBy}`;
                 }
 
-                url = `${config.uri}/api/now/table/${config.table}?sysparm_fields=${config.fields.join(',')}&sysparm_query=${query}&sysparm_limit=${config.limit}`;
+                url = `${config.uri}/api/now/table/${config.table}?sysparm_fields=${config.fields.join(',')}&sysparm_query=${query}&sysparm_limit=${config.limit}${config.sysparm? `&${config.sysparm}`:''}`;
             }
 
             // call the REST Api with the URL from above
@@ -282,6 +338,10 @@ const run = async ({ uri, table, fields, query, limit, dateField, threads = 1, p
             // get the configuration for the next page
             config = getRequestConfiguration(baseProperties, response, pageNum, expectedRowCount);
 
+            if (config.lastPageMaxDate) {
+                logs.lastPageMaxDate = config.lastPageMaxDate;
+            }
+
             // the message 
             logs.config.push({ ...log, message: config.message });
 
@@ -300,10 +360,13 @@ const run = async ({ uri, table, fields, query, limit, dateField, threads = 1, p
 
     // calculate total information
     const result = jobs.reduce((out, thread) => {
+        if (!out.maxDate || (thread.lastPageMaxDate && new Date(out.maxDate).getTime() < new Date(thread.lastPageMaxDate).getTime())) {
+            out.maxDate = thread.lastPageMaxDate;
+        }
         out.totalRows += thread.totalRowCount;
         out.totalPages += thread.pages;
         return out;
-    }, { totalRows: 0, totalPages: 0 })
+    }, { totalRows: 0, totalPages: 0, maxDate: undefined })
 
     result.jobs = jobs;
 
@@ -337,15 +400,17 @@ const snapshot = async (config, pageCallback) => {
  * @param {String} config.query - Query condition
  * @param {Number} config.limit - Number of rows per page
  * @param {String} config.dateField - sys_updated_on or sys_created_on
+ * @param {String} config.sysIdField - field holding the sys_id (default sys_id) 
+ * @param {String} config.sysparm - additional sysparm_ arguments like sysparm_display_value 
  * @param {Number} config.threads - Number of parallel threads to load data
  * @param {Number} config.pageThreshold - Stop loading additional data if number of loaded pages exceeds this factor (handy if table changes quickly while loading data)
  * @param {Promise<Array>} pageCallback - Results of the current page
  */
-const increment = async ({ uri, table, fields, query, limit, dateField, threads, pageThreshold, maxDateValue }, pageCallback = async (results) => {}) => {
+const increment = async ({ uri, table, fields, query, limit, dateField, sysIdField, sysparm, threads, pageThreshold, maxDateValue }, pageCallback = async (results) => {}) => {
 
     console.log('.'.repeat(40))
     console.log('  Increment load');
-    console.log({ uri, table, fields, query, limit, dateField, threads, pageThreshold, maxDateValue })
+    console.log({ uri, table, fields, query, limit, dateField, sysIdField, sysparm, threads, pageThreshold, maxDateValue })
     console.log('.'.repeat(40))
 
     if (!maxDateValue) {
@@ -387,7 +452,7 @@ const increment = async ({ uri, table, fields, query, limit, dateField, threads,
     }
 
     // run 
-    return run({ uri, table, fields, query: incrementQuery, limit, dateField, threads, pageThreshold }, pageCallback);
+    return run({ uri, table, fields, query: incrementQuery, limit, dateField, sysIdField, sysparm, threads, pageThreshold }, pageCallback);
 
 }
 
@@ -405,7 +470,7 @@ const increment = async ({ uri, table, fields, query, limit, dateField, threads,
  * @param {Number} num the number of parallel threads
  * @returns {Array} list of thread configuration
  */
-const getThreads = (num = 1) => {
+const getThreads = (num = 1, sysIdField = 'sys_id') => {
 
     const threads = [];
     num = num ? Math.abs(num) : 1
@@ -427,10 +492,10 @@ const getThreads = (num = 1) => {
     return threads.map((p) => {
         const query = [];
         if (p.min) {
-            query.push(`sys_id>=${p.min}`)
+            query.push(`${sysIdField}>=${p.min}`)
         }
         if (p.max) {
-            query.push(`sys_id<${p.max}`)
+            query.push(`${sysIdField}<${p.max}`)
         }
         if (query.length) {
             p.query = query.join('^');
