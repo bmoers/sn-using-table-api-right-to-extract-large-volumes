@@ -30,7 +30,7 @@ The solution proposed is to sort the records by sys_updated_on and upsert (inser
 
 **empty page** - an empty page is **not** an indicator that there is no more data - there is a good chance that there is just an ACL causing an empty page  
 
-**identical timestamp** - there is a risk that all records in a page do have the same timestamp value, in that case the query to the nex page (timestamp > lastrow(timestamp)) will miss some records.  
+**identical timestamp** - there is a risk that all records in a page do have the same timestamp value, in that case the query to the next page (timestamp > lastrow(timestamp)) will miss some records.  
 
 **rolling end** - if the records are created/updated in high frequency the number of rows exceed the window size and the job never ends
 
